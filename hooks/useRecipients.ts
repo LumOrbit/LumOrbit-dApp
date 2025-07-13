@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from './useAuth';
 import { Database } from '@/lib/database.types';
@@ -17,9 +17,9 @@ export function useRecipients() {
       setRecipients([]);
       setLoading(false);
     }
-  }, [user]);
+  }, [user, fetchRecipients]);
 
-  const fetchRecipients = async () => {
+  const fetchRecipients = useCallback(async () => {
     if (!user) return;
 
     try {
@@ -40,7 +40,7 @@ export function useRecipients() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [user]);
 
   const createRecipient = async (recipientData: Database['public']['Tables']['recipients']['Insert']) => {
     if (!user) return { error: new Error('No user logged in') };

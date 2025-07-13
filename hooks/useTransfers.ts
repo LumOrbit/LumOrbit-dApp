@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from './useAuth';
 import { Database } from '@/lib/database.types';
@@ -19,9 +19,9 @@ export function useTransfers() {
       setTransfers([]);
       setLoading(false);
     }
-  }, [user]);
+  }, [user, fetchTransfers]);
 
-  const fetchTransfers = async () => {
+  const fetchTransfers = useCallback(async () => {
     if (!user) return;
 
     try {
@@ -44,7 +44,7 @@ export function useTransfers() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [user]);
 
   const createTransfer = async (transferData: Database['public']['Tables']['transfers']['Insert']) => {
     if (!user) return { error: new Error('No user logged in') };
@@ -75,7 +75,7 @@ export function useTransfers() {
 
   const updateTransferStatus = async (transferId: string, status: string, stellarTxId?: string) => {
     try {
-      const updates: any = { status };
+      const updates: Partial<Database['public']['Tables']['transfers']['Update']> = { status };
       if (stellarTxId) {
         updates.stellar_transaction_id = stellarTxId;
       }
