@@ -26,7 +26,7 @@ export default function SignInScreen() {
       } else {
         router.replace('/(tabs)');
       }
-    } catch (error) {
+    } catch {
       Alert.alert('Error', 'An unexpected error occurred');
     } finally {
       setLoading(false);

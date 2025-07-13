@@ -2,7 +2,7 @@ import { View, Text, StyleSheet, TouchableOpacity, TextInput, Alert, ScrollView 
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { Eye, EyeOff, Mail, Lock, User, Phone, ArrowLeft, MapPin } from 'lucide-react-native';
+import { Eye, EyeOff, Mail, Lock, User, Phone, ArrowLeft, MapPin, Wallet } from 'lucide-react-native';
 import { useAuth } from '@/hooks/useAuth';
 
 export default function SignUpScreen() {
@@ -20,10 +20,7 @@ export default function SignUpScreen() {
   const [acceptedTerms, setAcceptedTerms] = useState(false);
   const { signUp } = useAuth();
 
-  const countries = [
-    'United States', 'Mexico', 'Guatemala', 'El Salvador', 'Honduras',
-    'Philippines', 'India', 'Nigeria', 'Bangladesh', 'Pakistan'
-  ];
+
 
   const updateFormData = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -66,6 +63,13 @@ export default function SignUpScreen() {
 
     setLoading(true);
     try {
+      // Show wallet creation notification
+      Alert.alert(
+        'Creating Your Account',
+        'We\'re setting up your account with a secure Stellar wallet. This may take a moment...',
+        [{ text: 'OK', style: 'default' }]
+      );
+
       const { error } = await signUp(formData.email, formData.password, {
         full_name: formData.fullName,
         phone: formData.phone,
@@ -75,10 +79,20 @@ export default function SignUpScreen() {
       if (error) {
         Alert.alert('Sign Up Failed', error.message);
       } else {
-        router.push('/(auth)/verify-email');
+        // Show success message with wallet info
+        Alert.alert(
+          'Account Created Successfully!',
+          'Your account has been created with a secure Stellar wallet. Please check your email to verify your account.',
+          [
+            {
+              text: 'Continue',
+              onPress: () => router.push('/(auth)/verify-email'),
+            },
+          ]
+        );
       }
-    } catch (error) {
-      Alert.alert('Error', 'An unexpected error occurred');
+    } catch {
+      Alert.alert('Error', 'An unexpected error occurred during account creation');
     } finally {
       setLoading(false);
     }
@@ -235,6 +249,19 @@ export default function SignUpScreen() {
               <Text style={styles.link}>Privacy Policy</Text>
             </Text>
           </TouchableOpacity>
+
+          {/* Stellar Wallet Info */}
+          <View style={styles.walletInfo}>
+            <View style={styles.walletIconContainer}>
+              <Wallet size={24} color="#2563eb" />
+            </View>
+            <View style={styles.walletTextContainer}>
+              <Text style={styles.walletTitle}>Stellar Wallet Included</Text>
+              <Text style={styles.walletDescription}>
+                Your account will automatically include a secure Stellar wallet for fast, low-cost international transfers.
+              </Text>
+            </View>
+          </View>
 
           {/* Sign Up Button */}
           <TouchableOpacity 
@@ -402,5 +429,37 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#2563eb',
     fontWeight: '600',
+  },
+  walletInfo: {
+    flexDirection: 'row',
+    backgroundColor: '#eff6ff',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 24,
+    borderWidth: 1,
+    borderColor: '#dbeafe',
+  },
+  walletIconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#ffffff',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  walletTextContainer: {
+    flex: 1,
+  },
+  walletTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1e40af',
+    marginBottom: 4,
+  },
+  walletDescription: {
+    fontSize: 14,
+    color: '#1e40af',
+    lineHeight: 20,
   },
 });

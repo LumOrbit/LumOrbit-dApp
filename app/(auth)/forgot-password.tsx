@@ -25,7 +25,7 @@ export default function ForgotPasswordScreen() {
       } else {
         setEmailSent(true);
       }
-    } catch (error) {
+    } catch {
       Alert.alert('Error', 'An unexpected error occurred');
     } finally {
       setLoading(false);
