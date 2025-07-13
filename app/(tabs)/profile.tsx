@@ -1,19 +1,66 @@
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Switch } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Switch, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useState } from 'react';
 import { User, Settings, Shield, Globe, CircleHelp as HelpCircle, LogOut, ChevronRight, Bell, CreditCard, FileText, Smartphone } from 'lucide-react-native';
+import { useAuth } from '@/hooks/useAuth';
+import { useUserProfile } from '@/hooks/useUserProfile';
+
+interface MenuItem {
+  icon: React.ComponentType<{ size: number; color: string }>;
+  label: string;
+  action: string;
+  badge?: string;
+  toggle?: boolean;
+  value?: string;
+}
 
 export default function ProfileScreen() {
+  const { signOut } = useAuth();
+  const { profile, loading } = useUserProfile();
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [biometricsEnabled, setBiometricsEnabled] = useState(false);
   const [selectedLanguage, setSelectedLanguage] = useState('en');
 
-  const profileData = {
-    name: 'Juan Carlos Mendez',
-    email: 'juan.mendez@email.com',
-    phone: '+1 (555) 123-4567',
-    memberSince: 'January 2024',
-    verificationStatus: 'Verified',
+  // Format user initials for avatar
+  const getUserInitials = (name: string | null | undefined) => {
+    if (!name) return 'U';
+    return name
+      .split(' ')
+      .map(n => n[0])
+      .join('')
+      .toUpperCase()
+      .slice(0, 2);
+  };
+
+  // Format member since date
+  const formatMemberSince = (dateString: string | null | undefined) => {
+    if (!dateString) return 'Recently';
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', { 
+      month: 'long', 
+      year: 'numeric' 
+    });
+  };
+
+  const handleSignOut = async () => {
+    Alert.alert(
+      'Sign Out',
+      'Are you sure you want to sign out?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { 
+          text: 'Sign Out', 
+          style: 'destructive',
+                     onPress: async () => {
+             try {
+               await signOut();
+             } catch {
+               Alert.alert('Error', 'Failed to sign out. Please try again.');
+             }
+           }
+        },
+      ]
+    );
   };
 
   const languages = [
@@ -26,7 +73,7 @@ export default function ProfileScreen() {
       title: 'Account',
       items: [
         { icon: User, label: 'Personal Information', action: 'personal-info' },
-        { icon: Shield, label: 'Identity Verification', action: 'verification', badge: 'Verified' },
+        { icon: Shield, label: 'Identity Verification', action: 'verification', badge: profile?.is_verified ? 'Verified' : 'Pending' },
         { icon: CreditCard, label: 'Payment Methods', action: 'payment-methods' },
         { icon: FileText, label: 'Documents', action: 'documents' },
       ]
@@ -60,7 +107,7 @@ export default function ProfileScreen() {
     // Here you would typically trigger a language change in your app
   };
 
-  const renderMenuItem = (item: any, index: number) => (
+  const renderMenuItem = (item: MenuItem, index: number) => (
     <TouchableOpacity key={index} style={styles.menuItem}>
       <View style={styles.menuItemLeft}>
         <View style={styles.menuIcon}>
@@ -68,7 +115,7 @@ export default function ProfileScreen() {
         </View>
         <Text style={styles.menuLabel}>{item.label}</Text>
         {item.badge && (
-          <View style={styles.badge}>
+          <View style={[styles.badge, !profile?.is_verified && { backgroundColor: '#f59e0b' }]}>
             <Text style={styles.badgeText}>{item.badge}</Text>
           </View>
         )}
@@ -99,6 +146,16 @@ export default function ProfileScreen() {
     </TouchableOpacity>
   );
 
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.loadingContainer}>
+          <Text style={styles.loadingText}>Loading profile...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
@@ -111,20 +168,33 @@ export default function ProfileScreen() {
         <View style={styles.profileCard}>
           <View style={styles.avatarContainer}>
             <View style={styles.avatar}>
-              <Text style={styles.avatarText}>JM</Text>
+              <Text style={styles.avatarText}>
+                {getUserInitials(profile?.full_name)}
+              </Text>
             </View>
-            <View style={styles.verificationBadge}>
-              <Shield size={16} color="#ffffff" />
-            </View>
+            {profile?.is_verified && (
+              <View style={styles.verificationBadge}>
+                <Shield size={16} color="#ffffff" />
+              </View>
+            )}
           </View>
           <View style={styles.profileInfo}>
-            <Text style={styles.profileName}>{profileData.name}</Text>
-            <Text style={styles.profileEmail}>{profileData.email}</Text>
+            <Text style={styles.profileName}>
+              {profile?.full_name || 'User'}
+            </Text>
+            <Text style={styles.profileEmail}>
+              {profile?.email || 'No email'}
+            </Text>
             <View style={styles.profileMeta}>
-              <Text style={styles.profileMetaText}>Member since {profileData.memberSince}</Text>
+              <Text style={styles.profileMetaText}>
+                Member since {formatMemberSince(profile?.created_at)}
+              </Text>
               <View style={styles.dot} />
-              <Text style={[styles.profileMetaText, { color: '#10b981' }]}>
-                {profileData.verificationStatus}
+              <Text style={[
+                styles.profileMetaText, 
+                { color: profile?.is_verified ? '#10b981' : '#f59e0b' }
+              ]}>
+                {profile?.is_verified ? 'Verified' : 'Pending'}
               </Text>
             </View>
           </View>
@@ -171,14 +241,14 @@ export default function ProfileScreen() {
         ))}
 
         {/* Logout Button */}
-        <TouchableOpacity style={styles.logoutButton}>
+        <TouchableOpacity style={styles.logoutButton} onPress={handleSignOut}>
           <LogOut size={20} color="#ef4444" />
           <Text style={styles.logoutText}>Sign Out</Text>
         </TouchableOpacity>
 
         {/* App Version */}
         <View style={styles.versionInfo}>
-          <Text style={styles.versionText}>StellarRemit v1.0.0</Text>
+          <Text style={styles.versionText}>LumOrbit v1.0.0</Text>
           <Text style={styles.versionSubtext}>Powered by Stellar Network</Text>
         </View>
       </ScrollView>
@@ -194,6 +264,15 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
     paddingHorizontal: 20,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    fontSize: 16,
+    color: '#6b7280',
   },
   header: {
     paddingVertical: 24,
