@@ -1,7 +1,7 @@
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useState } from 'react';
-import { ChevronRight, MapPin, User, CreditCard, Clock } from 'lucide-react-native';
+import { ChevronRight, User, CreditCard, Clock } from 'lucide-react-native';
 
 export default function SendScreen() {
   const [step, setStep] = useState(1);
