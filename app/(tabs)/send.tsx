@@ -1,6 +1,6 @@
+import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Modal, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useState } from 'react';
 import { ChevronRight, User, CreditCard, Clock, MapPin } from 'lucide-react-native';
 import Flag from 'react-native-round-flags';
 import { useRecipients } from '@/hooks/useRecipients';
@@ -8,9 +8,12 @@ import { useCountries } from '@/hooks/useCountries';
 import { useTransfers } from '@/hooks/useTransfers';
 import { useExchangeRates } from '@/hooks/useExchangeRates';
 import { useAuth } from '@/hooks/useAuth';
+import { useTransferPolling } from '@/hooks/useTransferPolling';
 import { Database } from '@/lib/database.types';
 import RecipientForm from '@/components/RecipientForm';
 import CountrySelector from '@/components/CountrySelector';
+import TransferProgressModal from '@/components/TransferProgressModal';
+import TransferSuccessModal from '@/components/TransferSuccessModal';
 
 type Recipient = Database['public']['Tables']['recipients']['Row'];
 
@@ -20,6 +23,7 @@ export default function SendScreen() {
   const { createTransfer, loading: transferLoading } = useTransfers();
   const { getRate } = useExchangeRates();
   const { user } = useAuth();
+  const { activeTransfer, startPolling, stopPolling } = useTransferPolling();
   
   const [step, setStep] = useState(1);
   const [selectedCountry, setSelectedCountry] = useState('');
@@ -29,6 +33,8 @@ export default function SendScreen() {
   const [showAddRecipient, setShowAddRecipient] = useState(false);
   const [showCountrySelector, setShowCountrySelector] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [completedTransferData, setCompletedTransferData] = useState<any>(null);
 
   const supportedCountries = getSupportedCountries();
 
@@ -55,6 +61,27 @@ export default function SendScreen() {
     setShowCountrySelector(false);
   };
 
+  // Monitor transfer completion
+  React.useEffect(() => {
+    if (activeTransfer?.status === 'completed') {
+      // Stop polling and show success modal
+      stopPolling();
+      
+      if (selectedRecipient && selectedCountryData) {
+        setCompletedTransferData({
+          amount,
+          recipientName: selectedRecipient.full_name,
+          country: selectedCountryData.name,
+          trackingNumber: generateTrackingNumber(),
+          localAmount,
+          currency: selectedCountryData.currency,
+          stellarTxId: activeTransfer.stellarTxId
+        });
+        setShowSuccessModal(true);
+      }
+    }
+  }, [activeTransfer?.status]);
+
   const handleSendMoney = async () => {
     if (!selectedRecipient || !amount || !selectedCountryData || !selectedDeliveryData || !user) {
       Alert.alert('Error', 'Please fill in all required fields');
@@ -63,6 +90,7 @@ export default function SendScreen() {
 
     setIsSubmitting(true);
     try {
+      const trackingNumber = generateTrackingNumber();
       const transferData = {
         user_id: user.id,
         recipient_id: selectedRecipient.id,
@@ -75,7 +103,7 @@ export default function SendScreen() {
         to_currency: selectedCountryData.currency,
         delivery_method: selectedDeliveryData.name,
         status: 'pending',
-        tracking_number: generateTrackingNumber(),
+        tracking_number: trackingNumber,
         estimated_delivery: new Date(Date.now() + (selectedDeliveryData.id === 'wallet' ? 0 : 24 * 60 * 60 * 1000)).toISOString(),
       };
 
@@ -84,24 +112,10 @@ export default function SendScreen() {
       if (result.error) {
         Alert.alert('Error', 'Failed to create transfer. Please try again.');
         console.error('Transfer creation error:', result.error);
-      } else {
-        Alert.alert(
-          'Transfer Created!',
-          `Your transfer of $${amount} to ${selectedRecipient.full_name} has been initiated. Tracking number: ${transferData.tracking_number}`,
-          [
-            {
-              text: 'OK',
-              onPress: () => {
-                // Reset form
-                setStep(1);
-                setSelectedCountry('');
-                setAmount('');
-                setSelectedRecipient(null);
-                setSelectedDeliveryMethod('');
-              }
-            }
-          ]
-        );
+      } else if (result.data) {
+        // Start the real-time polling process
+        const recipientWallet = selectedRecipient.wallet_address || 'GDX5DQWQEQG7U4YMFKZ6QXV6QZHQHFQ4IQHQPHQP4I2X3JQHQHQ'; // Mock wallet for demo
+        startPolling(result.data.id, parseFloat(amount), recipientWallet);
       }
     } catch (error) {
       Alert.alert('Error', 'An unexpected error occurred. Please try again.');
@@ -109,6 +123,18 @@ export default function SendScreen() {
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const handleSuccessModalClose = () => {
+    setShowSuccessModal(false);
+    setCompletedTransferData(null);
+    
+    // Reset form
+    setStep(1);
+    setSelectedCountry('');
+    setAmount('');
+    setSelectedRecipient(null);
+    setSelectedDeliveryMethod('');
   };
 
   const renderStepIndicator = () => (
@@ -238,27 +264,29 @@ export default function SendScreen() {
       {recipientsLoading ? (
         <Text style={styles.loadingText}>Loading recipients...</Text>
       ) : recipients.length === 0 ? (
-        <Text style={styles.emptyText}>No recipients added yet</Text>
+        <Text style={styles.noRecipientsText}>No recipients found. Add a new recipient to continue.</Text>
       ) : (
-        recipients.map((rec) => (
-          <TouchableOpacity
-            key={rec.id}
-            style={[
-              styles.recipientCard,
-              selectedRecipient?.id === rec.id && styles.selectedRecipientCard
-            ]}
-            onPress={() => setSelectedRecipient(rec)}
-          >
-            <View style={styles.recipientAvatar}>
-              <Text style={styles.recipientInitial}>{rec.full_name.charAt(0)}</Text>
-            </View>
-            <View style={styles.recipientInfo}>
-              <Text style={styles.recipientName}>{rec.full_name}</Text>
-              <Text style={styles.recipientLocation}>{rec.country}</Text>
-            </View>
-            <ChevronRight size={20} color="#6b7280" />
-          </TouchableOpacity>
-        ))
+        <ScrollView style={styles.recipientsList} showsVerticalScrollIndicator={false}>
+          {recipients.map((recipient) => (
+            <TouchableOpacity
+              key={recipient.id}
+              style={[
+                styles.recipientCard,
+                selectedRecipient?.id === recipient.id && styles.selectedRecipientCard
+              ]}
+              onPress={() => setSelectedRecipient(recipient)}
+            >
+              <View style={styles.recipientInfo}>
+                <Text style={styles.recipientName}>{recipient.full_name}</Text>
+                <Text style={styles.recipientCountry}>{recipient.country}</Text>
+                <Text style={styles.recipientMethod}>{recipient.delivery_method}</Text>
+              </View>
+              {selectedRecipient?.id === recipient.id && (
+                <View style={styles.selectedIndicator} />
+              )}
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
       )}
 
       <View style={styles.stepButtons}>
@@ -278,48 +306,62 @@ export default function SendScreen() {
 
   const renderStep4 = () => (
     <View style={styles.stepContent}>
-      <Text style={styles.stepTitle}>Delivery Method</Text>
-      <Text style={styles.stepSubtitle}>How should the recipient receive the money?</Text>
+      <Text style={styles.stepTitle}>Choose Delivery Method</Text>
+      <Text style={styles.stepSubtitle}>How should {selectedRecipient?.full_name} receive the money?</Text>
       
       {deliveryMethods.map((method) => (
-        <TouchableOpacity 
-          key={method.id} 
+        <TouchableOpacity
+          key={method.id}
           style={[
-            styles.deliveryCard,
+            styles.deliveryMethodCard,
             selectedDeliveryMethod === method.id && styles.selectedDeliveryCard
           ]}
           onPress={() => setSelectedDeliveryMethod(method.id)}
         >
-          <View style={styles.deliveryIcon}>
-            <CreditCard size={24} color="#2563eb" />
-          </View>
-          <View style={styles.deliveryInfo}>
-            <Text style={styles.deliveryName}>{method.name}</Text>
-            <View style={styles.deliveryDetails}>
-              <Clock size={16} color="#6b7280" />
-              <Text style={styles.deliveryTime}>{method.time}</Text>
+          <View style={styles.deliveryMethodInfo}>
+            <CreditCard size={24} color={selectedDeliveryMethod === method.id ? '#2563eb' : '#6b7280'} />
+            <View style={styles.deliveryMethodDetails}>
+              <Text style={[
+                styles.deliveryMethodName,
+                selectedDeliveryMethod === method.id && styles.selectedDeliveryText
+              ]}>
+                {method.name}
+              </Text>
+              <Text style={styles.deliveryMethodTime}>
+                <Clock size={12} color="#6b7280" /> {method.time}
+              </Text>
             </View>
           </View>
-          <Text style={styles.deliveryFee}>${method.fee.toFixed(2)}</Text>
+          <Text style={[
+            styles.deliveryMethodFee,
+            selectedDeliveryMethod === method.id && styles.selectedDeliveryText
+          ]}>
+            ${method.fee.toFixed(2)}
+          </Text>
         </TouchableOpacity>
       ))}
 
-      <View style={styles.summaryCard}>
+      {/* Transfer Summary */}
+      <View style={styles.transferSummary}>
         <Text style={styles.summaryTitle}>Transfer Summary</Text>
         <View style={styles.summaryRow}>
-          <Text style={styles.summaryLabel}>Amount:</Text>
+          <Text style={styles.summaryLabel}>Amount to send</Text>
           <Text style={styles.summaryValue}>${amount}</Text>
         </View>
         <View style={styles.summaryRow}>
-          <Text style={styles.summaryLabel}>Fee ({selectedDeliveryData?.name}):</Text>
+          <Text style={styles.summaryLabel}>Transfer fee</Text>
           <Text style={styles.summaryValue}>${feeAmount.toFixed(2)}</Text>
         </View>
         <View style={styles.summaryRow}>
-          <Text style={styles.summaryLabel}>Total:</Text>
-          <Text style={styles.summaryTotal}>${totalAmount}</Text>
+          <Text style={styles.summaryLabel}>Exchange rate</Text>
+          <Text style={styles.summaryValue}>1 USD = {exchangeRate.toFixed(4)} {selectedCountryData?.currency}</Text>
+        </View>
+        <View style={[styles.summaryRow, styles.totalRow]}>
+          <Text style={styles.totalLabel}>Total amount</Text>
+          <Text style={styles.totalValue}>${totalAmount}</Text>
         </View>
         <View style={styles.summaryRow}>
-          <Text style={styles.summaryLabel}>Recipient gets:</Text>
+          <Text style={styles.summaryLabel}>{selectedRecipient?.full_name} will receive</Text>
           <Text style={styles.summaryValue}>{localAmount} {selectedCountryData?.currency}</Text>
         </View>
       </View>
@@ -328,16 +370,13 @@ export default function SendScreen() {
         <TouchableOpacity style={styles.backButton} onPress={() => setStep(3)}>
           <Text style={styles.backButtonText}>Back</Text>
         </TouchableOpacity>
-        <TouchableOpacity 
-          style={[
-            styles.sendButton, 
-            (!selectedDeliveryMethod || isSubmitting) && styles.disabledButton
-          ]}
+        <TouchableOpacity
+          style={[styles.sendButton, (!selectedDeliveryMethod || isSubmitting) && styles.disabledButton]}
           disabled={!selectedDeliveryMethod || isSubmitting}
           onPress={handleSendMoney}
         >
           <Text style={styles.sendButtonText}>
-            {isSubmitting ? 'Sending...' : 'Send Money'}
+            {isSubmitting ? 'Processing...' : 'Send Money'}
           </Text>
         </TouchableOpacity>
       </View>
@@ -360,8 +399,12 @@ export default function SendScreen() {
         {step === 4 && renderStep4()}
       </ScrollView>
 
-      {/* Country Selector Modal */}
-      <Modal visible={showCountrySelector} animationType="slide" presentationStyle="fullScreen">
+      {/* Modals */}
+      <Modal
+        visible={showCountrySelector}
+        animationType="slide"
+        presentationStyle="pageSheet"
+      >
         <CountrySelector
           countries={supportedCountries}
           selectedCountry={selectedCountry}
@@ -370,15 +413,37 @@ export default function SendScreen() {
         />
       </Modal>
 
-      {/* Add Recipient Modal */}
-      <Modal visible={showAddRecipient} animationType="slide" presentationStyle="pageSheet">
+      <Modal
+        visible={showAddRecipient}
+        animationType="slide"
+        presentationStyle="pageSheet"
+      >
         <RecipientForm
           onClose={() => setShowAddRecipient(false)}
-          onSuccess={() => {
-            setShowAddRecipient(false);
-          }}
+          onSuccess={() => setShowAddRecipient(false)}
         />
       </Modal>
+
+      {/* Real-time Progress Modal */}
+      {activeTransfer && activeTransfer.status !== 'completed' && (
+        <TransferProgressModal
+          visible={true}
+          progress={activeTransfer.progress}
+          status={activeTransfer.status}
+          message={activeTransfer.message}
+          recipientName={selectedRecipient?.full_name || 'Recipient'}
+          amount={amount}
+        />
+      )}
+
+      {/* Success Modal */}
+      {showSuccessModal && completedTransferData && (
+        <TransferSuccessModal
+          visible={showSuccessModal}
+          onClose={handleSuccessModalClose}
+          transferData={completedTransferData}
+        />
+      )}
     </SafeAreaView>
   );
 }
@@ -565,6 +630,15 @@ const styles = StyleSheet.create({
     color: '#1f2937',
     marginBottom: 16,
   },
+  recipientsList: {
+    maxHeight: 200, // Limit height for scrolling
+  },
+  noRecipientsText: {
+    fontSize: 16,
+    color: '#6b7280',
+    textAlign: 'center',
+    padding: 20,
+  },
   recipientCard: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -583,20 +657,6 @@ const styles = StyleSheet.create({
   selectedRecipientCard: {
     borderColor: '#2563eb',
   },
-  recipientAvatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#2563eb',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-  },
-  recipientInitial: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#ffffff',
-  },
   recipientInfo: {
     flex: 1,
   },
@@ -606,11 +666,23 @@ const styles = StyleSheet.create({
     color: '#1f2937',
     marginBottom: 2,
   },
-  recipientLocation: {
+  recipientCountry: {
     fontSize: 14,
     color: '#6b7280',
   },
-  deliveryCard: {
+  recipientMethod: {
+    fontSize: 14,
+    color: '#6b7280',
+  },
+  selectedIndicator: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#2563eb',
+    position: 'absolute',
+    right: 16,
+  },
+  deliveryMethodCard: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#ffffff',
@@ -628,39 +700,30 @@ const styles = StyleSheet.create({
   selectedDeliveryCard: {
     borderColor: '#2563eb',
   },
-  deliveryIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: '#f0f9ff',
-    justifyContent: 'center',
+  deliveryMethodInfo: {
+    flexDirection: 'row',
     alignItems: 'center',
     marginRight: 16,
   },
-  deliveryInfo: {
-    flex: 1,
+  deliveryMethodDetails: {
+    marginLeft: 12,
   },
-  deliveryName: {
+  deliveryMethodName: {
     fontSize: 16,
     fontWeight: '600',
     color: '#1f2937',
     marginBottom: 4,
   },
-  deliveryDetails: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  deliveryTime: {
+  deliveryMethodTime: {
     fontSize: 14,
     color: '#6b7280',
-    marginLeft: 4,
   },
-  deliveryFee: {
+  deliveryMethodFee: {
     fontSize: 16,
     fontWeight: 'bold',
     color: '#2563eb',
   },
-  summaryCard: {
+  transferSummary: {
     backgroundColor: '#ffffff',
     borderRadius: 12,
     padding: 20,
@@ -691,10 +754,23 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#1f2937',
   },
-  summaryTotal: {
+  totalRow: {
+    marginTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#e5e7eb',
+  },
+  totalLabel: {
+    fontSize: 16,
+    color: '#6b7280',
+  },
+  totalValue: {
     fontSize: 18,
     fontWeight: 'bold',
     color: '#1f2937',
+  },
+  selectedDeliveryText: {
+    color: '#2563eb',
+    fontWeight: '600',
   },
   stepButtons: {
     flexDirection: 'row',
