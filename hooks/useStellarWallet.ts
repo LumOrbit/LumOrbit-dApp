@@ -275,11 +275,19 @@ export function useStellarWallet() {
    */
   const clearWalletData = async (userId: string): Promise<void> => {
     try {
-      await AsyncStorage.removeItem(`stellar_wallet_${userId}`);
+      console.log('🗑️ useStellarWallet clearWalletData called for user:', userId);
+      const key = `stellar_wallet_${userId}`;
+      console.log('🔑 Removing AsyncStorage key:', key);
+      
+      await AsyncStorage.removeItem(key);
+      console.log('✅ AsyncStorage item removed');
+      
       setWalletData(null);
       setError(null);
+      console.log('✅ Wallet state cleared');
     } catch (err) {
-      console.error('Error clearing wallet data:', err);
+      console.error('💥 Error clearing wallet data:', err);
+      throw err; // Re-throw to let the caller handle it
     }
   };
 

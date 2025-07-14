@@ -1,4 +1,4 @@
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Switch, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Switch, Alert, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useState } from 'react';
 import { User, Settings, Shield, Globe, CircleHelp as HelpCircle, LogOut, ChevronRight, Bell, CreditCard, FileText, Smartphone } from 'lucide-react-native';
@@ -21,6 +21,7 @@ export default function ProfileScreen() {
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [biometricsEnabled, setBiometricsEnabled] = useState(false);
   const [selectedLanguage, setSelectedLanguage] = useState('en');
+  const [isSigningOut, setIsSigningOut] = useState(false);
 
   // Format user initials for avatar
   const getUserInitials = (name: string | null | undefined) => {
@@ -44,24 +45,22 @@ export default function ProfileScreen() {
   };
 
   const handleSignOut = async () => {
-    Alert.alert(
-      'Sign Out',
-      'Are you sure you want to sign out?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { 
-          text: 'Sign Out', 
-          style: 'destructive',
-                     onPress: async () => {
-             try {
-               await signOut();
-             } catch {
-               Alert.alert('Error', 'Failed to sign out. Please try again.');
-             }
-           }
-        },
-      ]
-    );
+    console.log('🔴 Starting auth hook signOut test');
+    setIsSigningOut(true);
+    try {
+      const result = await signOut();
+      if (result?.error) {
+        console.log(`❌ Auth hook signOut error: ${result.error.message}`);
+        Alert.alert('Error', `Failed to sign out: ${result.error.message}`);
+      } else {
+        console.log('✅ Auth hook signOut successful');
+      }
+    } catch (error) {
+      console.log(`💥 Auth hook signOut exception: ${error}`);
+      Alert.alert('Error', `Failed to sign out: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setIsSigningOut(false);
+    }
   };
 
   const languages = [
@@ -286,9 +285,15 @@ export default function ProfileScreen() {
         ))}
 
         {/* Logout Button */}
-        <TouchableOpacity style={styles.logoutButton} onPress={handleSignOut}>
-          <LogOut size={20} color="#ef4444" />
-          <Text style={styles.logoutText}>Sign Out</Text>
+        <TouchableOpacity 
+          style={[styles.logoutButton, isSigningOut && styles.logoutButtonDisabled]} 
+          onPress={handleSignOut}
+          disabled={isSigningOut}
+        >
+          <LogOut size={20} color={isSigningOut ? "#9ca3af" : "#ef4444"} />
+          <Text style={[styles.logoutText, isSigningOut && styles.logoutTextDisabled]}>
+            {isSigningOut ? 'Signing Out...' : 'Sign Out'}
+          </Text>
         </TouchableOpacity>
 
         {/* App Version */}
@@ -531,11 +536,17 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 3,
   },
+  logoutButtonDisabled: {
+    opacity: 0.6,
+  },
   logoutText: {
     fontSize: 16,
     fontWeight: '600',
     color: '#ef4444',
     marginLeft: 8,
+  },
+  logoutTextDisabled: {
+    color: '#9ca3af',
   },
   versionInfo: {
     alignItems: 'center',

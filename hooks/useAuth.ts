@@ -328,15 +328,28 @@ export function useAuth() {
 
   const signOut = async () => {
     try {
+      console.log('🔴 useAuth signOut called, user:', user?.id);
+      
       // Clear wallet data before signing out
       if (user) {
+        console.log('🗑️ Clearing wallet data for user:', user.id);
         await clearWalletData(user.id);
+        console.log('✅ Wallet data cleared');
+      } else {
+        console.log('⚠️ No user found to clear wallet data');
       }
       
+      console.log('🔄 Calling Supabase signOut...');
       const { error } = await supabase.auth.signOut();
+      console.log('📋 Supabase signOut result - error:', error);
+      
+      if (!error) {
+        console.log('✅ Supabase signOut successful');
+      }
+      
       return { error };
     } catch (err) {
-      console.error('Error in signOut:', err);
+      console.error('💥 Error in signOut:', err);
       return { error: err as Error };
     }
   };

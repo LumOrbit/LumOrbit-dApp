@@ -11,7 +11,10 @@ export default function AuthGuard({ children }: AuthGuardProps) {
   const { user, loading } = useAuth();
 
   useEffect(() => {
+    console.log('🛡️ AuthGuard - user:', user?.id, 'loading:', loading);
+    
     if (!loading && !user) {
+      console.log('🔄 AuthGuard redirecting to welcome screen');
       router.replace('/(auth)/welcome');
     }
   }, [user, loading]);
