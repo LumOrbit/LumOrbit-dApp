@@ -2,6 +2,7 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Alert,
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useState, useEffect } from 'react';
 import { User, Phone, MapPin, Save, Edit3 } from 'lucide-react-native';
+import Flag from 'react-native-round-flags';
 import { useUserProfile } from '@/hooks/useUserProfile';
 import { useCountries } from '@/hooks/useCountries';
 
@@ -194,7 +195,9 @@ export default function PersonalInfoScreen() {
                       ]}
                       onPress={() => updateFormData('country', country.code)}
                     >
-                      <Text style={styles.countryFlag}>{country.flag_emoji}</Text>
+                      <View style={styles.countryFlagContainer}>
+                        <Flag code={country.code} style={styles.countryFlagImage} />
+                      </View>
                       <Text style={[
                         styles.countryName,
                         formData.country === country.code && styles.selectedCountryName
@@ -377,9 +380,18 @@ const styles = StyleSheet.create({
   selectedCountryOption: {
     backgroundColor: '#f0f9ff',
   },
-  countryFlag: {
-    fontSize: 18,
+  countryFlagContainer: {
     marginRight: 12,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    overflow: 'hidden',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  countryFlagImage: {
+    width: 20,
+    height: 20,
   },
   countryName: {
     fontSize: 16,
