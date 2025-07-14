@@ -2,6 +2,7 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Modal,
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useState } from 'react';
 import { ChevronRight, User, CreditCard, Clock, MapPin } from 'lucide-react-native';
+import Flag from 'react-native-round-flags';
 import { useRecipients } from '@/hooks/useRecipients';
 import { useCountries } from '@/hooks/useCountries';
 import { useTransfers } from '@/hooks/useTransfers';
@@ -151,7 +152,9 @@ export default function SendScreen() {
           <View style={styles.countrySelectInfo}>
             {selectedCountryData ? (
               <>
-                <Text style={styles.selectedCountryFlag}>{selectedCountryData.flag_emoji}</Text>
+                <View style={styles.selectedCountryFlagContainer}>
+                  <Flag code={selectedCountryData.code} style={styles.selectedCountryFlagImage} />
+                </View>
                 <View style={styles.selectedCountryDetails}>
                   <Text style={styles.selectedCountryName}>{selectedCountryData.name}</Text>
                   <Text style={styles.selectedCountryRate}>
@@ -469,9 +472,18 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#9ca3af',
   },
-  selectedCountryFlag: {
-    fontSize: 24,
+  selectedCountryFlagContainer: {
     marginRight: 12,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    overflow: 'hidden',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  selectedCountryFlagImage: {
+    width: 28,
+    height: 28,
   },
   selectedCountryDetails: {
     flex: 1,
