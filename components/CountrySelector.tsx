@@ -9,6 +9,7 @@ import {
   SafeAreaView,
 } from 'react-native';
 import { X, Search, TrendingUp } from 'lucide-react-native';
+import Flag from 'react-native-round-flags';
 import { useExchangeRates } from '@/hooks/useExchangeRates';
 
 interface Country {
@@ -82,7 +83,9 @@ export default function CountrySelector({
         style={[styles.countryItem, isSelected && styles.selectedCountryItem]}
         onPress={() => onSelectCountry(country.code)}
       >
-        <Text style={styles.countryFlag}>{country.flag_emoji}</Text>
+        <View style={styles.flagContainer}>
+          <Flag code={country.code} style={styles.flagImage} />
+        </View>
         <View style={styles.countryInfo}>
           <Text style={styles.countryName}>{country.name}</Text>
           <Text style={styles.currencyInfo}>
@@ -265,9 +268,18 @@ const styles = StyleSheet.create({
     borderColor: '#2563eb',
     backgroundColor: '#f0f9ff',
   },
-  countryFlag: {
-    fontSize: 28,
+  flagContainer: {
     marginRight: 16,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    overflow: 'hidden',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  flagImage: {
+    width: 32,
+    height: 32,
   },
   countryInfo: {
     flex: 1,
