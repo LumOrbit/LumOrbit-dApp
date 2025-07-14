@@ -1,8 +1,12 @@
+import { useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { TrendingUp, DollarSign, Send, Clock } from 'lucide-react-native';
+import { router } from 'expo-router';
 
 export default function HomeScreen() {
+  const scrollViewRef = useRef<ScrollView>(null);
+  
   const exchangeRates = [
     { from: 'USD', to: 'MXN', rate: '18.45', change: '+0.25' },
     { from: 'USD', to: 'PHP', rate: '56.20', change: '-0.15' },
@@ -11,15 +15,35 @@ export default function HomeScreen() {
   ];
 
   const quickActions = [
-    { icon: Send, label: 'Send Money', color: '#2563eb' },
-    { icon: Clock, label: 'Recent', color: '#10b981' },
-    { icon: TrendingUp, label: 'Rates', color: '#f59e0b' },
-    { icon: DollarSign, label: 'Add Funds', color: '#8b5cf6' },
+    { icon: Send, label: 'Send Money', color: '#2563eb', action: 'send' },
+    { icon: Clock, label: 'Recent', color: '#10b981', action: 'recent' },
+    { icon: TrendingUp, label: 'Rates', color: '#f59e0b', action: 'rates' },
+    { icon: DollarSign, label: 'Add Funds', color: '#8b5cf6', action: 'add-funds' },
   ];
+
+  const handleQuickAction = (action: string) => {
+    switch (action) {
+      case 'send':
+        router.push('/(tabs)/send');
+        break;
+      case 'recent':
+        router.push('/(tabs)/history');
+        break;
+      case 'rates':
+        // Scroll to the Exchange Rates section
+        scrollViewRef.current?.scrollTo({ y: 400, animated: true });
+        break;
+      case 'add-funds':
+        router.push('/settings/payment-methods');
+        break;
+      default:
+        break;
+    }
+  };
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView ref={scrollViewRef} style={styles.content} showsVerticalScrollIndicator={false}>
         {/* Header */}
         <View style={styles.header}>
           <Text style={styles.welcomeText}>Welcome back!</Text>
@@ -32,7 +56,10 @@ export default function HomeScreen() {
           <Text style={styles.balanceAmount}>$1,247.50</Text>
           <View style={styles.balanceFooter}>
             <Text style={styles.stellar}>🌟 Stellar Network</Text>
-            <TouchableOpacity style={styles.addFundsButton}>
+            <TouchableOpacity 
+              style={styles.addFundsButton}
+              onPress={() => router.push('/settings/payment-methods')}
+            >
               <Text style={styles.addFundsText}>+ Add Funds</Text>
             </TouchableOpacity>
           </View>
@@ -45,7 +72,11 @@ export default function HomeScreen() {
             {quickActions.map((action, index) => {
               const Icon = action.icon;
               return (
-                <TouchableOpacity key={index} style={styles.actionCard}>
+                <TouchableOpacity 
+                  key={index} 
+                  style={styles.actionCard}
+                  onPress={() => handleQuickAction(action.action)}
+                >
                   <View style={[styles.actionIcon, { backgroundColor: action.color + '20' }]}>
                     <Icon size={24} color={action.color} />
                   </View>

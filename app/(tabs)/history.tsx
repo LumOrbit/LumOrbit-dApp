@@ -1,13 +1,14 @@
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, RefreshControl } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useState } from 'react';
-import { CircleCheck as CheckCircle, Clock, Circle as XCircle, Filter, Search } from 'lucide-react-native';
+import { CircleCheck as CheckCircle, Clock, Circle as XCircle, Filter, Search, RefreshCw } from 'lucide-react-native';
 import { useTransfers } from '@/hooks/useTransfers';
 import { router } from 'expo-router';
 
 export default function HistoryScreen() {
-  const { transfers, loading } = useTransfers();
+  const { transfers, loading, refetch } = useTransfers();
   const [selectedFilter, setSelectedFilter] = useState('all');
+  const [refreshing, setRefreshing] = useState(false);
 
   const filters = [
     { id: 'all', label: 'All' },
@@ -20,6 +21,17 @@ export default function HistoryScreen() {
     if (selectedFilter === 'all') return true;
     return transfer.status === selectedFilter;
   });
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    try {
+      await refetch();
+    } catch (error) {
+      console.error('Error refreshing transfers:', error);
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
   const getStatusIcon = (status: string) => {
     switch (status) {
@@ -110,7 +122,18 @@ export default function HistoryScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView 
+        style={styles.content} 
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            colors={['#2563eb']}
+            tintColor="#2563eb"
+          />
+        }
+      >
         <View style={styles.header}>
           <Text style={styles.title}>Transfer History</Text>
           <Text style={styles.subtitle}>Track all your money transfers</Text>
@@ -213,6 +236,16 @@ export default function HistoryScreen() {
                 ? 'You haven\'t made any transfers yet' 
                 : `No ${selectedFilter} transfers found`}
             </Text>
+            <TouchableOpacity 
+              style={styles.refreshButton}
+              onPress={handleRefresh}
+              disabled={refreshing}
+            >
+              <RefreshCw size={16} color="#2563eb" />
+              <Text style={styles.refreshButtonText}>
+                {refreshing ? 'Refreshing...' : 'Refresh'}
+              </Text>
+            </TouchableOpacity>
           </View>
         )}
 
@@ -222,9 +255,15 @@ export default function HistoryScreen() {
             <Search size={20} color="#2563eb" />
             <Text style={styles.actionButtonText}>Search Transfers</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.actionButton}>
-            <Filter size={20} color="#2563eb" />
-            <Text style={styles.actionButtonText}>Advanced Filters</Text>
+          <TouchableOpacity 
+            style={styles.actionButton}
+            onPress={handleRefresh}
+            disabled={refreshing}
+          >
+            <RefreshCw size={20} color="#2563eb" />
+            <Text style={styles.actionButtonText}>
+              {refreshing ? 'Refreshing...' : 'Refresh'}
+            </Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
@@ -477,5 +516,20 @@ const styles = StyleSheet.create({
     marginTop: 10,
     fontSize: 16,
     color: '#6b7280',
+  },
+  refreshButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f0f9ff',
+    borderRadius: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    marginTop: 20,
+  },
+  refreshButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#2563eb',
+    marginLeft: 8,
   },
 });
