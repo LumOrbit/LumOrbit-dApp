@@ -10,15 +10,6 @@ export function useRecipients() {
   const [recipients, setRecipients] = useState<Recipient[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    if (user) {
-      fetchRecipients();
-    } else {
-      setRecipients([]);
-      setLoading(false);
-    }
-  }, [user, fetchRecipients]);
-
   const fetchRecipients = useCallback(async () => {
     if (!user) return;
 
@@ -41,6 +32,15 @@ export function useRecipients() {
       setLoading(false);
     }
   }, [user]);
+
+  useEffect(() => {
+    if (user) {
+      fetchRecipients();
+    } else {
+      setRecipients([]);
+      setLoading(false);
+    }
+  }, [user, fetchRecipients]);
 
   const createRecipient = async (recipientData: Database['public']['Tables']['recipients']['Insert']) => {
     if (!user) return { error: new Error('No user logged in') };
