@@ -202,6 +202,11 @@ LumOrbit currently supports:
 
 Contributions are welcome! Please open an issue or pull request for suggestions, improvements, or bug reports.
 
-## License
+## AI tools:
+
+– Bolt for building a mockup
+– Cursor for code
+– ChatGPT Plus for the logo
+– Claude for navigating the documentation
 
 MIT
