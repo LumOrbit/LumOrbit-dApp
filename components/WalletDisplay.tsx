@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
 import { Wallet, RefreshCw, Copy, Eye, EyeOff } from 'lucide-react-native';
 import { useStellarWallet } from '@/hooks/useStellarWallet';
@@ -16,11 +16,19 @@ export default function WalletDisplay({ showPrivateKey = false }: WalletDisplayP
   const [showSecret, setShowSecret] = useState(false);
   const [privateKey, setPrivateKey] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (user) {
+  // Memoize the loadWalletData call to prevent excessive calls
+  const handleLoadWalletData = useCallback(() => {
+    if (user && !isLoading) {
       loadWalletData(user);
     }
-  }, [user, loadWalletData]);
+  }, [user, loadWalletData, isLoading]);
+
+  useEffect(() => {
+    // Only load wallet data if we have a user and no wallet data yet
+    if (user && !walletData && !isLoading) {
+      handleLoadWalletData();
+    }
+  }, [user, walletData, isLoading]); // Remove loadWalletData from dependency array
 
   const handleCopyAddress = async () => {
     if (walletData?.walletAddress) {
@@ -329,4 +337,4 @@ const styles = StyleSheet.create({
     marginTop: 8,
     textAlign: 'center',
   },
-}); 
+});
