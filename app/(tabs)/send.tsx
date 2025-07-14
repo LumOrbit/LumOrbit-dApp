@@ -1,26 +1,25 @@
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Modal } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useState } from 'react';
 import { ChevronRight, User, CreditCard, Clock } from 'lucide-react-native';
+import { useRecipients } from '@/hooks/useRecipients';
+import { useCountries } from '@/hooks/useCountries';
+import { Database } from '@/lib/database.types';
+import RecipientForm from '@/components/RecipientForm';
+
+type Recipient = Database['public']['Tables']['recipients']['Row'];
 
 export default function SendScreen() {
+  const { recipients, loading: recipientsLoading } = useRecipients();
+  const { getSupportedCountries, getCountryByCode } = useCountries();
+  
   const [step, setStep] = useState(1);
   const [selectedCountry, setSelectedCountry] = useState('');
   const [amount, setAmount] = useState('');
-  const [recipient, setRecipient] = useState('');
+  const [selectedRecipient, setSelectedRecipient] = useState<Recipient | null>(null);
+  const [showAddRecipient, setShowAddRecipient] = useState(false);
 
-  const countries = [
-    { code: 'MX', name: 'Mexico', flag: '🇲🇽', rate: '18.45' },
-    { code: 'PH', name: 'Philippines', flag: '🇵🇭', rate: '56.20' },
-    { code: 'IN', name: 'India', flag: '🇮🇳', rate: '83.12' },
-    { code: 'GT', name: 'Guatemala', flag: '🇬🇹', rate: '7.85' },
-  ];
-
-  const savedRecipients = [
-    { name: 'Maria Rodriguez', location: 'Mexico City, MX' },
-    { name: 'José García', location: 'Guadalajara, MX' },
-    { name: 'Ana Santos', location: 'Manila, PH' },
-  ];
+  const supportedCountries = getSupportedCountries();
 
   const deliveryMethods = [
     { id: 'bank', name: 'Bank Transfer', time: '1-2 business days', fee: '$2.99' },
@@ -60,7 +59,7 @@ export default function SendScreen() {
       <Text style={styles.stepSubtitle}>Where are you sending money?</Text>
       
       <View style={styles.countriesGrid}>
-        {countries.map((country) => (
+        {supportedCountries.map((country) => (
           <TouchableOpacity
             key={country.code}
             style={[
@@ -69,9 +68,9 @@ export default function SendScreen() {
             ]}
             onPress={() => setSelectedCountry(country.code)}
           >
-            <Text style={styles.countryFlag}>{country.flag}</Text>
+            <Text style={styles.countryFlag}>{country.flag_emoji}</Text>
             <Text style={styles.countryName}>{country.name}</Text>
-            <Text style={styles.countryRate}>1 USD = {country.rate}</Text>
+            <Text style={styles.countryRate}>1 USD = {country.currency}</Text>
           </TouchableOpacity>
         ))}
       </View>
@@ -130,40 +129,49 @@ export default function SendScreen() {
       <Text style={styles.stepTitle}>Select Recipient</Text>
       <Text style={styles.stepSubtitle}>Who are you sending money to?</Text>
       
-      <TouchableOpacity style={styles.addRecipientButton}>
+      <TouchableOpacity 
+        style={styles.addRecipientButton}
+        onPress={() => setShowAddRecipient(true)}
+      >
         <User size={24} color="#2563eb" />
         <Text style={styles.addRecipientText}>Add New Recipient</Text>
         <ChevronRight size={20} color="#6b7280" />
       </TouchableOpacity>
 
       <Text style={styles.savedRecipientsTitle}>Saved Recipients</Text>
-      {savedRecipients.map((rec, index) => (
-        <TouchableOpacity
-          key={index}
-          style={[
-            styles.recipientCard,
-            recipient === rec.name && styles.selectedRecipientCard
-          ]}
-          onPress={() => setRecipient(rec.name)}
-        >
-          <View style={styles.recipientAvatar}>
-            <Text style={styles.recipientInitial}>{rec.name.charAt(0)}</Text>
-          </View>
-          <View style={styles.recipientInfo}>
-            <Text style={styles.recipientName}>{rec.name}</Text>
-            <Text style={styles.recipientLocation}>{rec.location}</Text>
-          </View>
-          <ChevronRight size={20} color="#6b7280" />
-        </TouchableOpacity>
-      ))}
+      {recipientsLoading ? (
+        <Text style={styles.loadingText}>Loading recipients...</Text>
+      ) : recipients.length === 0 ? (
+        <Text style={styles.emptyText}>No recipients added yet</Text>
+      ) : (
+        recipients.map((rec) => (
+          <TouchableOpacity
+            key={rec.id}
+            style={[
+              styles.recipientCard,
+              selectedRecipient?.id === rec.id && styles.selectedRecipientCard
+            ]}
+            onPress={() => setSelectedRecipient(rec)}
+          >
+            <View style={styles.recipientAvatar}>
+              <Text style={styles.recipientInitial}>{rec.full_name.charAt(0)}</Text>
+            </View>
+            <View style={styles.recipientInfo}>
+              <Text style={styles.recipientName}>{rec.full_name}</Text>
+              <Text style={styles.recipientLocation}>{rec.country}</Text>
+            </View>
+            <ChevronRight size={20} color="#6b7280" />
+          </TouchableOpacity>
+        ))
+      )}
 
       <View style={styles.stepButtons}>
         <TouchableOpacity style={styles.backButton} onPress={() => setStep(2)}>
           <Text style={styles.backButtonText}>Back</Text>
         </TouchableOpacity>
         <TouchableOpacity
-          style={[styles.continueButton, !recipient && styles.disabledButton]}
-          disabled={!recipient}
+          style={[styles.continueButton, !selectedRecipient && styles.disabledButton]}
+          disabled={!selectedRecipient}
           onPress={() => setStep(4)}
         >
           <Text style={styles.continueButtonText}>Continue</Text>
@@ -235,6 +243,16 @@ export default function SendScreen() {
         {step === 3 && renderStep3()}
         {step === 4 && renderStep4()}
       </ScrollView>
+
+      {/* Add Recipient Modal */}
+      <Modal visible={showAddRecipient} animationType="slide" presentationStyle="pageSheet">
+        <RecipientForm
+          onClose={() => setShowAddRecipient(false)}
+          onSuccess={() => {
+            setShowAddRecipient(false);
+          }}
+        />
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -577,5 +595,17 @@ const styles = StyleSheet.create({
   },
   disabledButton: {
     backgroundColor: '#d1d5db',
+  },
+  loadingText: {
+    fontSize: 16,
+    color: '#6b7280',
+    textAlign: 'center',
+    padding: 20,
+  },
+  emptyText: {
+    fontSize: 16,
+    color: '#6b7280',
+    textAlign: 'center',
+    padding: 20,
   },
 });
