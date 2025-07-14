@@ -218,9 +218,9 @@ export default function ProfileScreen() {
               </Text>
             </View>
             {profile?.is_verified && (
-              <View style={styles.verificationBadge}>
-                <Shield size={16} color="#ffffff" />
-              </View>
+            <View style={styles.verificationBadge}>
+              <Shield size={16} color="#ffffff" />
+            </View>
             )}
           </View>
           <View style={styles.profileInfo}>
