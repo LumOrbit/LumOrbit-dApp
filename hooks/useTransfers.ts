@@ -12,15 +12,6 @@ export function useTransfers() {
   const [transfers, setTransfers] = useState<Transfer[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    if (user) {
-      fetchTransfers();
-    } else {
-      setTransfers([]);
-      setLoading(false);
-    }
-  }, [user, fetchTransfers]);
-
   const fetchTransfers = useCallback(async () => {
     if (!user) return;
 
@@ -45,6 +36,15 @@ export function useTransfers() {
       setLoading(false);
     }
   }, [user]);
+
+  useEffect(() => {
+    if (user) {
+      fetchTransfers();
+    } else {
+      setTransfers([]);
+      setLoading(false);
+    }
+  }, [user, fetchTransfers]);
 
   const createTransfer = async (transferData: Database['public']['Tables']['transfers']['Insert']) => {
     if (!user) return { error: new Error('No user logged in') };
@@ -108,11 +108,74 @@ export function useTransfers() {
     }
   };
 
+  const updateTransfer = async (transferId: string, updates: Partial<Database['public']['Tables']['transfers']['Update']>) => {
+    if (!user) return { error: new Error('No user logged in') };
+
+    try {
+      const updateData = {
+        ...updates,
+        updated_at: new Date().toISOString()
+      };
+
+      const { data, error } = await supabase
+        .from('transfers')
+        .update(updateData)
+        .eq('id', transferId)
+        .eq('user_id', user.id) // Ensure user can only update their own transfers
+        .select(`
+          *,
+          recipient:recipients(*)
+        `)
+        .single();
+
+      if (error) {
+        return { error };
+      }
+
+      setTransfers(prev => 
+        prev.map(transfer => 
+          transfer.id === transferId ? data as Transfer : transfer
+        )
+      );
+      return { data, error: null };
+    } catch (error) {
+      return { error };
+    }
+  };
+
+  const deleteTransfer = async (transferId: string) => {
+    if (!user) return { error: new Error('No user logged in') };
+
+    try {
+      const { error } = await supabase
+        .from('transfers')
+        .delete()
+        .eq('id', transferId)
+        .eq('user_id', user.id); // Ensure user can only delete their own transfers
+
+      if (error) {
+        return { error };
+      }
+
+      setTransfers(prev => prev.filter(transfer => transfer.id !== transferId));
+      return { error: null };
+    } catch (error) {
+      return { error };
+    }
+  };
+
+  const cancelTransfer = async (transferId: string) => {
+    return updateTransferStatus(transferId, 'cancelled');
+  };
+
   return {
     transfers,
     loading,
     createTransfer,
+    updateTransfer,
     updateTransferStatus,
+    deleteTransfer,
+    cancelTransfer,
     refetch: fetchTransfers,
   };
 }
