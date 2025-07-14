@@ -1,78 +1,13 @@
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useState } from 'react';
 import { CircleCheck as CheckCircle, Clock, Circle as XCircle, Filter, Search } from 'lucide-react-native';
+import { useTransfers } from '@/hooks/useTransfers';
+import { router } from 'expo-router';
 
 export default function HistoryScreen() {
+  const { transfers, loading } = useTransfers();
   const [selectedFilter, setSelectedFilter] = useState('all');
-
-  const transfers = [
-    {
-      id: 'T001',
-      recipient: 'Maria Rodriguez',
-      country: 'Mexico',
-      flag: '🇲🇽',
-      amount: 250.00,
-      fee: 2.99,
-      status: 'completed',
-      date: '2024-01-15',
-      time: '2:30 PM',
-      method: 'Bank Transfer',
-      trackingNumber: 'ST7834920485',
-    },
-    {
-      id: 'T002',
-      recipient: 'José García',
-      country: 'Mexico',
-      flag: '🇲🇽',
-      amount: 150.00,
-      fee: 2.99,
-      status: 'pending',
-      date: '2024-01-16',
-      time: '10:15 AM',
-      method: 'Cash Pickup',
-      trackingNumber: 'ST7834920486',
-    },
-    {
-      id: 'T003',
-      recipient: 'Ana Santos',
-      country: 'Philippines',
-      flag: '🇵🇭',
-      amount: 300.00,
-      fee: 3.99,
-      status: 'failed',
-      date: '2024-01-14',
-      time: '4:45 PM',
-      method: 'Mobile Wallet',
-      trackingNumber: 'ST7834920484',
-    },
-    {
-      id: 'T004',
-      recipient: 'Carlos Mendez',
-      country: 'Guatemala',
-      flag: '🇬🇹',
-      amount: 200.00,
-      fee: 2.99,
-      status: 'completed',
-      date: '2024-01-13',
-      time: '11:20 AM',
-      method: 'Bank Transfer',
-      trackingNumber: 'ST7834920483',
-    },
-    {
-      id: 'T005',
-      recipient: 'Rosa Martinez',
-      country: 'Mexico',
-      flag: '🇲🇽',
-      amount: 180.00,
-      fee: 2.99,
-      status: 'completed',
-      date: '2024-01-12',
-      time: '3:10 PM',
-      method: 'Cash Pickup',
-      trackingNumber: 'ST7834920482',
-    },
-  ];
 
   const filters = [
     { id: 'all', label: 'All' },
@@ -80,6 +15,11 @@ export default function HistoryScreen() {
     { id: 'pending', label: 'Pending' },
     { id: 'failed', label: 'Failed' },
   ];
+
+  const filteredTransfers = transfers.filter(transfer => {
+    if (selectedFilter === 'all') return true;
+    return transfer.status === selectedFilter;
+  });
 
   const getStatusIcon = (status: string) => {
     switch (status) {
@@ -112,21 +52,61 @@ export default function HistoryScreen() {
       case 'completed':
         return 'Completed';
       case 'pending':
-        return 'In Progress';
+        return 'Pending';
       case 'failed':
         return 'Failed';
       default:
-        return 'Unknown';
+        return status.charAt(0).toUpperCase() + status.slice(1);
     }
   };
 
-  const filteredTransfers = selectedFilter === 'all' 
-    ? transfers 
-    : transfers.filter(transfer => transfer.status === selectedFilter);
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+    });
+  };
+
+  const formatTime = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleTimeString('en-US', {
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true,
+    });
+  };
+
+  const getCountryFlag = (country: string) => {
+    // Simple mapping for common countries
+    const flagMap: { [key: string]: string } = {
+      'Mexico': '🇲🇽',
+      'Philippines': '🇵🇭',
+      'Guatemala': '🇬🇹',
+      'India': '🇮🇳',
+      'Nigeria': '🇳🇬',
+      'Kenya': '🇰🇪',
+      'Uganda': '🇺🇬',
+      'Ghana': '🇬🇭',
+    };
+    return flagMap[country] || '🌍';
+  };
+
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#2563eb" />
+          <Text style={styles.loadingText}>Loading transfers...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   const totalSent = transfers
     .filter(t => t.status === 'completed')
-    .reduce((sum, t) => sum + t.amount, 0);
+    .reduce((sum, t) => sum + t.amount_usd, 0);
 
   return (
     <SafeAreaView style={styles.container}>
@@ -180,10 +160,10 @@ export default function HistoryScreen() {
             <TouchableOpacity key={transfer.id} style={styles.transferCard}>
               <View style={styles.transferHeader}>
                 <View style={styles.transferBasicInfo}>
-                  <Text style={styles.transferFlag}>{transfer.flag}</Text>
+                  <Text style={styles.transferFlag}>{getCountryFlag(transfer.recipient.country)}</Text>
                   <View style={styles.transferDetails}>
-                    <Text style={styles.recipientName}>{transfer.recipient}</Text>
-                    <Text style={styles.transferLocation}>{transfer.country}</Text>
+                    <Text style={styles.recipientName}>{transfer.recipient.full_name}</Text>
+                    <Text style={styles.transferLocation}>{transfer.recipient.country}</Text>
                   </View>
                 </View>
                 <View style={styles.transferStatus}>
@@ -199,21 +179,24 @@ export default function HistoryScreen() {
 
               <View style={styles.transferMeta}>
                 <View style={styles.transferAmount}>
-                  <Text style={styles.amountText}>-${transfer.amount.toFixed(2)}</Text>
-                  <Text style={styles.feeText}>Fee: ${transfer.fee}</Text>
+                  <Text style={styles.amountText}>-${transfer.amount_usd.toFixed(2)}</Text>
+                  <Text style={styles.feeText}>Fee: ${transfer.fee_usd.toFixed(2)}</Text>
                 </View>
                 <View style={styles.transferDate}>
-                  <Text style={styles.dateText}>{transfer.date}</Text>
-                  <Text style={styles.timeText}>{transfer.time}</Text>
+                  <Text style={styles.dateText}>{formatDate(transfer.created_at)}</Text>
+                  <Text style={styles.timeText}>{formatTime(transfer.created_at)}</Text>
                 </View>
               </View>
 
               <View style={styles.transferFooter}>
                 <View style={styles.methodInfo}>
-                  <Text style={styles.methodText}>{transfer.method}</Text>
-                  <Text style={styles.trackingText}>#{transfer.trackingNumber}</Text>
+                  <Text style={styles.methodText}>{transfer.delivery_method}</Text>
+                  <Text style={styles.trackingText}>#{transfer.tracking_number}</Text>
                 </View>
-                <TouchableOpacity style={styles.viewButton}>
+                <TouchableOpacity 
+                  style={styles.viewButton}
+                  onPress={() => router.push(`/transfer-details?id=${transfer.id}`)}
+                >
                   <Text style={styles.viewButtonText}>View Details</Text>
                 </TouchableOpacity>
               </View>
@@ -483,5 +466,16 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#2563eb',
     marginLeft: 8,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#f8fafc',
+  },
+  loadingText: {
+    marginTop: 10,
+    fontSize: 16,
+    color: '#6b7280',
   },
 });
