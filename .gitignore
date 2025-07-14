@@ -1,0 +1,5 @@
+expo-env.d.ts
+node_modules
+.cursor
+.expo
+.env
