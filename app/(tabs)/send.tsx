@@ -1,9 +1,12 @@
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Modal } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Modal, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useState } from 'react';
 import { ChevronRight, User, CreditCard, Clock } from 'lucide-react-native';
 import { useRecipients } from '@/hooks/useRecipients';
 import { useCountries } from '@/hooks/useCountries';
+import { useTransfers } from '@/hooks/useTransfers';
+import { useExchangeRates } from '@/hooks/useExchangeRates';
+import { useAuth } from '@/hooks/useAuth';
 import { Database } from '@/lib/database.types';
 import RecipientForm from '@/components/RecipientForm';
 
@@ -12,20 +15,93 @@ type Recipient = Database['public']['Tables']['recipients']['Row'];
 export default function SendScreen() {
   const { recipients, loading: recipientsLoading } = useRecipients();
   const { getSupportedCountries, getCountryByCode } = useCountries();
+  const { createTransfer, loading: transferLoading } = useTransfers();
+  const { getRate } = useExchangeRates();
+  const { user } = useAuth();
   
   const [step, setStep] = useState(1);
   const [selectedCountry, setSelectedCountry] = useState('');
   const [amount, setAmount] = useState('');
   const [selectedRecipient, setSelectedRecipient] = useState<Recipient | null>(null);
+  const [selectedDeliveryMethod, setSelectedDeliveryMethod] = useState('');
   const [showAddRecipient, setShowAddRecipient] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const supportedCountries = getSupportedCountries();
 
   const deliveryMethods = [
-    { id: 'bank', name: 'Bank Transfer', time: '1-2 business days', fee: '$2.99' },
-    { id: 'cash', name: 'Cash Pickup', time: 'Within hours', fee: '$4.99' },
-    { id: 'wallet', name: 'Mobile Wallet', time: 'Instant', fee: '$1.99' },
+    { id: 'bank', name: 'Bank Transfer', time: '1-2 business days', fee: 2.99 },
+    { id: 'cash', name: 'Cash Pickup', time: 'Within hours', fee: 4.99 },
+    { id: 'wallet', name: 'Mobile Wallet', time: 'Instant', fee: 1.99 },
   ];
+
+  const selectedCountryData = selectedCountry ? getCountryByCode(selectedCountry) : null;
+  const exchangeRateData = selectedCountryData ? getRate('USD', selectedCountryData.currency) : null;
+  const exchangeRate = exchangeRateData?.rate || 1;
+  const selectedDeliveryData = deliveryMethods.find(m => m.id === selectedDeliveryMethod);
+  const feeAmount = selectedDeliveryData?.fee || 2.99;
+  const localAmount = amount ? (parseFloat(amount) * exchangeRate).toFixed(2) : '0.00';
+  const totalAmount = amount ? (parseFloat(amount) + feeAmount).toFixed(2) : '0.00';
+
+  const generateTrackingNumber = () => {
+    return 'ST' + Date.now().toString() + Math.random().toString(36).substr(2, 5).toUpperCase();
+  };
+
+  const handleSendMoney = async () => {
+    if (!selectedRecipient || !amount || !selectedCountryData || !selectedDeliveryData || !user) {
+      Alert.alert('Error', 'Please fill in all required fields');
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const transferData = {
+        user_id: user.id,
+        recipient_id: selectedRecipient.id,
+        amount_usd: parseFloat(amount),
+        amount_local: parseFloat(localAmount),
+        exchange_rate: exchangeRate,
+        fee_usd: feeAmount,
+        total_usd: parseFloat(totalAmount),
+        from_currency: 'USD',
+        to_currency: selectedCountryData.currency,
+        delivery_method: selectedDeliveryData.name,
+        status: 'pending',
+        tracking_number: generateTrackingNumber(),
+        estimated_delivery: new Date(Date.now() + (selectedDeliveryData.id === 'wallet' ? 0 : 24 * 60 * 60 * 1000)).toISOString(),
+      };
+
+      const result = await createTransfer(transferData);
+      
+      if (result.error) {
+        Alert.alert('Error', 'Failed to create transfer. Please try again.');
+        console.error('Transfer creation error:', result.error);
+      } else {
+        Alert.alert(
+          'Transfer Created!',
+          `Your transfer of $${amount} to ${selectedRecipient.full_name} has been initiated. Tracking number: ${transferData.tracking_number}`,
+          [
+            {
+              text: 'OK',
+              onPress: () => {
+                // Reset form
+                setStep(1);
+                setSelectedCountry('');
+                setAmount('');
+                setSelectedRecipient(null);
+                setSelectedDeliveryMethod('');
+              }
+            }
+          ]
+        );
+      }
+    } catch (error) {
+      Alert.alert('Error', 'An unexpected error occurred. Please try again.');
+      console.error('Transfer creation error:', error);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   const renderStepIndicator = () => (
     <View style={styles.stepIndicator}>
@@ -104,9 +180,9 @@ export default function SendScreen() {
 
       <View style={styles.conversionCard}>
         <Text style={styles.conversionText}>
-          Recipient will receive: {amount ? (parseFloat(amount) * 18.45).toFixed(2) : '0.00'} MXN
+          Recipient will receive: {localAmount} {selectedCountryData?.currency || 'Currency'}
         </Text>
-        <Text style={styles.feeText}>Transfer fee: $2.99</Text>
+        <Text style={styles.feeText}>Transfer fee: ${feeAmount.toFixed(2)}</Text>
       </View>
 
       <View style={styles.stepButtons}>
@@ -186,7 +262,14 @@ export default function SendScreen() {
       <Text style={styles.stepSubtitle}>How should the recipient receive the money?</Text>
       
       {deliveryMethods.map((method) => (
-        <TouchableOpacity key={method.id} style={styles.deliveryCard}>
+        <TouchableOpacity 
+          key={method.id} 
+          style={[
+            styles.deliveryCard,
+            selectedDeliveryMethod === method.id && styles.selectedDeliveryCard
+          ]}
+          onPress={() => setSelectedDeliveryMethod(method.id)}
+        >
           <View style={styles.deliveryIcon}>
             <CreditCard size={24} color="#2563eb" />
           </View>
@@ -197,7 +280,7 @@ export default function SendScreen() {
               <Text style={styles.deliveryTime}>{method.time}</Text>
             </View>
           </View>
-          <Text style={styles.deliveryFee}>{method.fee}</Text>
+          <Text style={styles.deliveryFee}>${method.fee.toFixed(2)}</Text>
         </TouchableOpacity>
       ))}
 
@@ -208,12 +291,16 @@ export default function SendScreen() {
           <Text style={styles.summaryValue}>${amount}</Text>
         </View>
         <View style={styles.summaryRow}>
-          <Text style={styles.summaryLabel}>Fee:</Text>
-          <Text style={styles.summaryValue}>$2.99</Text>
+          <Text style={styles.summaryLabel}>Fee ({selectedDeliveryData?.name}):</Text>
+          <Text style={styles.summaryValue}>${feeAmount.toFixed(2)}</Text>
         </View>
         <View style={styles.summaryRow}>
           <Text style={styles.summaryLabel}>Total:</Text>
-          <Text style={styles.summaryTotal}>${(parseFloat(amount) + 2.99).toFixed(2)}</Text>
+          <Text style={styles.summaryTotal}>${totalAmount}</Text>
+        </View>
+        <View style={styles.summaryRow}>
+          <Text style={styles.summaryLabel}>Recipient gets:</Text>
+          <Text style={styles.summaryValue}>{localAmount} {selectedCountryData?.currency}</Text>
         </View>
       </View>
 
@@ -221,8 +308,17 @@ export default function SendScreen() {
         <TouchableOpacity style={styles.backButton} onPress={() => setStep(3)}>
           <Text style={styles.backButtonText}>Back</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.sendButton}>
-          <Text style={styles.sendButtonText}>Send Money</Text>
+        <TouchableOpacity 
+          style={[
+            styles.sendButton, 
+            (!selectedDeliveryMethod || isSubmitting) && styles.disabledButton
+          ]}
+          disabled={!selectedDeliveryMethod || isSubmitting}
+          onPress={handleSendMoney}
+        >
+          <Text style={styles.sendButtonText}>
+            {isSubmitting ? 'Sending...' : 'Send Money'}
+          </Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -476,11 +572,16 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 20,
     marginBottom: 12,
+    borderWidth: 2,
+    borderColor: 'transparent',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
+  },
+  selectedDeliveryCard: {
+    borderColor: '#2563eb',
   },
   deliveryIcon: {
     width: 48,
