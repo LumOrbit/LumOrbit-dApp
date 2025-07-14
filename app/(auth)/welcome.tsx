@@ -68,11 +68,11 @@ export default function WelcomeScreen() {
         <View style={styles.header}>
           <View style={styles.logoContainer}>
             <View style={styles.logo}>
-              <Text style={styles.logoText}>⭐</Text>
+              <Text style={styles.logoText}>💫</Text>
             </View>
           </View>
           <Text style={styles.title}>
-            {selectedLanguage === 'en' ? 'StellarRemit' : 'StellarRemit'}
+            {selectedLanguage === 'en' ? 'LumOrbit' : 'LumOrbit'}
           </Text>
           <Text style={styles.subtitle}>
             {selectedLanguage === 'en' 
