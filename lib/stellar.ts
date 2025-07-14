@@ -1,7 +1,7 @@
 // Stellar SDK integration for StellarRemit
 // This file contains utilities for Stellar blockchain operations
 
-import { Keypair, TransactionBuilder, Networks, Operation, Asset, Memo, Horizon } from 'stellar-sdk';
+import { Keypair, Networks, Operation, Asset, Memo, TransactionBuilder, Horizon } from '@stellar/stellar-sdk';
 
 // Stellar network configuration
 const STELLAR_NETWORK = Networks.TESTNET; // Use MAINNET for production
