@@ -80,3 +80,122 @@ export function useExchangeRates() {
     refetch: fetchRates,
   };
 }
+
+const createExchangeRate = async (rateData: Database['public']['Tables']['exchange_rates']['Insert']) => {
+  try {
+    const { data, error } = await supabase
+      .from('exchange_rates')
+      .insert({
+        ...rateData,
+        last_updated: new Date().toISOString()
+      })
+      .select()
+      .single();
+
+    if (error) {
+      return { error };
+    }
+
+    return { data, error: null };
+  } catch (error) {
+    return { error };
+  }
+};
+
+const updateExchangeRate = async (rateId: string, updates: Partial<Database['public']['Tables']['exchange_rates']['Update']>) => {
+  try {
+    const updateData = {
+      ...updates,
+      last_updated: new Date().toISOString()
+    };
+
+    const { data, error } = await supabase
+      .from('exchange_rates')
+      .update(updateData)
+      .eq('id', rateId)
+      .select()
+      .single();
+
+    if (error) {
+      return { error };
+    }
+
+    return { data, error: null };
+  } catch (error) {
+    return { error };
+  }
+};
+
+const updateExchangeRateByCurrency = async (fromCurrency: string, toCurrency: string, rate: number, change24h?: number) => {
+  try {
+    const updateData: Database['public']['Tables']['exchange_rates']['Update'] = {
+      rate,
+      last_updated: new Date().toISOString()
+    };
+    
+    if (change24h !== undefined) {
+      updateData.change_24h = change24h;
+    }
+
+    const { data, error } = await supabase
+      .from('exchange_rates')
+      .update(updateData)
+      .eq('from_currency', fromCurrency)
+      .eq('to_currency', toCurrency)
+      .select()
+      .single();
+
+    if (error) {
+      return { error };
+    }
+
+    return { data, error: null };
+  } catch (error) {
+    return { error };
+  }
+};
+
+const deleteExchangeRate = async (rateId: string) => {
+  try {
+    const { error } = await supabase
+      .from('exchange_rates')
+      .delete()
+      .eq('id', rateId);
+
+    if (error) {
+      return { error };
+    }
+
+    return { error: null };
+  } catch (error) {
+    return { error };
+  }
+};
+
+const batchUpdateExchangeRates = async (rates: Array<{fromCurrency: string, toCurrency: string, rate: number, change24h?: number}>) => {
+  try {
+    const updatePromises = rates.map(rateUpdate => 
+      updateExchangeRateByCurrency(rateUpdate.fromCurrency, rateUpdate.toCurrency, rateUpdate.rate, rateUpdate.change24h)
+    );
+
+    const results = await Promise.allSettled(updatePromises);
+    const errors = results.filter(result => result.status === 'rejected' || (result.status === 'fulfilled' && result.value.error));
+    
+    if (errors.length > 0) {
+      return { error: new Error(`Failed to update ${errors.length} exchange rates`) };
+    }
+
+    return { error: null };
+  } catch (error) {
+    return { error };
+  }
+};
+
+// Export standalone functions for admin/system use
+export { 
+  createExchangeRate, 
+  updateExchangeRate, 
+  updateExchangeRateByCurrency, 
+  deleteExchangeRate, 
+  batchUpdateExchangeRates 
+};
