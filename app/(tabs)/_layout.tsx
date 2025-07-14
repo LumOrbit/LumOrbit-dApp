@@ -1,5 +1,5 @@
 import { Tabs } from 'expo-router';
-import { Chrome as Home, Send, Clock, User } from 'lucide-react-native';
+import { Chrome as Home, Send, Clock, User, Star } from 'lucide-react-native';
 import AuthGuard from '@/components/AuthGuard';
 
 export default function TabLayout() {
@@ -49,6 +49,15 @@ export default function TabLayout() {
             title: 'History',
             tabBarIcon: ({ size, color }) => (
               <Clock size={size} color={color} />
+            ),
+          }}
+        />
+        <Tabs.Screen
+          name="stellar"
+          options={{
+            title: 'Stellar',
+            tabBarIcon: ({ size, color }) => (
+              <Star size={size} color={color} />
             ),
           }}
         />
