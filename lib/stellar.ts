@@ -1,11 +1,11 @@
 // Stellar SDK integration for StellarRemit
 // This file contains utilities for Stellar blockchain operations
 
-import { Keypair, Server, TransactionBuilder, Networks, Operation, Asset, Memo } from 'stellar-sdk';
+import { Keypair, TransactionBuilder, Networks, Operation, Asset, Memo, Horizon } from 'stellar-sdk';
 
 // Stellar network configuration
 const STELLAR_NETWORK = Networks.TESTNET; // Use MAINNET for production
-const STELLAR_SERVER = new Server('https://horizon-testnet.stellar.org'); // Use https://horizon.stellar.org for mainnet
+const STELLAR_SERVER = new Horizon.Server('https://horizon-testnet.stellar.org'); // Use https://horizon.stellar.org for mainnet
 
 export interface StellarWallet {
   publicKey: string;
@@ -25,11 +25,24 @@ export interface TransferParams {
  * Generate a new Stellar keypair
  */
 export function generateStellarWallet(): StellarWallet {
-  const keypair = Keypair.random();
-  return {
-    publicKey: keypair.publicKey(),
-    secretKey: keypair.secret(),
-  };
+  try {
+    const keypair = Keypair.random();
+    const result = {
+      publicKey: keypair.publicKey(),
+      secretKey: keypair.secret(),
+    };
+    
+    // Validate that the keypair was generated correctly
+    if (!result.publicKey || !result.secretKey) {
+      throw new Error('Failed to generate valid Stellar keypair');
+    }
+    
+    console.log('Stellar keypair generated successfully');
+    return result;
+  } catch (error) {
+    console.error('Error generating Stellar wallet:', error);
+    throw new Error('Failed to generate Stellar wallet');
+  }
 }
 
 /**
@@ -38,7 +51,7 @@ export function generateStellarWallet(): StellarWallet {
 export async function getAccountBalance(publicKey: string): Promise<number> {
   try {
     const account = await STELLAR_SERVER.loadAccount(publicKey);
-    const xlmBalance = account.balances.find(balance => balance.asset_type === 'native');
+    const xlmBalance = account.balances.find((balance: any) => balance.asset_type === 'native');
     return xlmBalance ? parseFloat(xlmBalance.balance) : 0;
   } catch (error) {
     console.error('Error fetching account balance:', error);
@@ -70,7 +83,7 @@ export async function sendStellarPayment(params: TransferParams): Promise<string
 
     // Build the transaction
     const transaction = new TransactionBuilder(sourceAccount, {
-      fee: await STELLAR_SERVER.fetchBaseFee(),
+      fee: (await STELLAR_SERVER.fetchBaseFee()).toString(),
       networkPassphrase: STELLAR_NETWORK,
     });
 
@@ -151,6 +164,16 @@ export function isValidStellarSecretKey(secretKey: string): boolean {
  */
 export function encryptPrivateKey(privateKey: string, password: string): string {
   try {
+    // Validate inputs
+    if (!privateKey || typeof privateKey !== 'string') {
+      throw new Error('Invalid private key provided for encryption');
+    }
+    if (!password || typeof password !== 'string') {
+      throw new Error('Invalid password provided for encryption');
+    }
+    
+    console.log('Encrypting private key with password length:', password.length);
+    
     // For React Native, we'll use a more secure approach
     // In a real production app, consider using react-native-keychain
     // or hardware-backed key storage
@@ -172,7 +195,10 @@ export function encryptPrivateKey(privateKey: string, password: string): string 
     result[0] = checksum;
     result.set(encrypted, 1);
     
-    return btoa(String.fromCharCode.apply(null, Array.from(result)));
+    const encryptedString = btoa(String.fromCharCode.apply(null, Array.from(result)));
+    console.log('Private key encrypted successfully, length:', encryptedString.length);
+    
+    return encryptedString;
   } catch (error) {
     console.error('Encryption failed:', error);
     throw new Error('Failed to encrypt private key');
