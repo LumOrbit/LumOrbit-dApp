@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { User, Settings, Shield, Globe, CircleHelp as HelpCircle, LogOut, ChevronRight, Bell, CreditCard, FileText, Smartphone } from 'lucide-react-native';
 import { useAuth } from '@/hooks/useAuth';
 import { useUserProfile } from '@/hooks/useUserProfile';
+import { router } from 'expo-router';
 
 interface MenuItem {
   icon: React.ComponentType<{ size: number; color: string }>;
@@ -107,8 +108,52 @@ export default function ProfileScreen() {
     // Here you would typically trigger a language change in your app
   };
 
+  const handleMenuItemPress = (action: string) => {
+    switch (action) {
+      case 'personal-info':
+        router.push('/settings/personal-info');
+        break;
+      case 'verification':
+        router.push('/settings/verification');
+        break;
+      case 'payment-methods':
+        router.push('/settings/payment-methods');
+        break;
+      case 'documents':
+        router.push('/settings/documents');
+        break;
+      case 'pin-settings':
+        router.push('/settings/pin-settings');
+        break;
+      case '2fa':
+        router.push('/settings/two-factor-auth');
+        break;
+      case 'notifications':
+        router.push('/settings/notifications');
+        break;
+      case 'language':
+        router.push('/settings/language');
+        break;
+      case 'help':
+        router.push('/settings/help');
+        break;
+      case 'support':
+        router.push('/settings/support');
+        break;
+      case 'terms':
+        router.push('/settings/terms');
+        break;
+      default:
+        Alert.alert('Coming Soon', 'This feature is not yet implemented');
+    }
+  };
+
   const renderMenuItem = (item: MenuItem, index: number) => (
-    <TouchableOpacity key={index} style={styles.menuItem}>
+    <TouchableOpacity 
+      key={index} 
+      style={styles.menuItem}
+      onPress={() => !item.toggle && handleMenuItemPress(item.action)}
+    >
       <View style={styles.menuItemLeft}>
         <View style={styles.menuIcon}>
           <item.icon size={20} color="#2563eb" />
