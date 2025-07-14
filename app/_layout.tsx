@@ -1,3 +1,6 @@
+// Polyfill URL for Stellar SDK compatibility
+import 'react-native-url-polyfill/auto';
+
 import React from 'react';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
