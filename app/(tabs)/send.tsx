@@ -1,7 +1,7 @@
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Modal, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useState } from 'react';
-import { ChevronRight, User, CreditCard, Clock } from 'lucide-react-native';
+import { ChevronRight, User, CreditCard, Clock, MapPin } from 'lucide-react-native';
 import { useRecipients } from '@/hooks/useRecipients';
 import { useCountries } from '@/hooks/useCountries';
 import { useTransfers } from '@/hooks/useTransfers';
@@ -9,6 +9,7 @@ import { useExchangeRates } from '@/hooks/useExchangeRates';
 import { useAuth } from '@/hooks/useAuth';
 import { Database } from '@/lib/database.types';
 import RecipientForm from '@/components/RecipientForm';
+import CountrySelector from '@/components/CountrySelector';
 
 type Recipient = Database['public']['Tables']['recipients']['Row'];
 
@@ -25,6 +26,7 @@ export default function SendScreen() {
   const [selectedRecipient, setSelectedRecipient] = useState<Recipient | null>(null);
   const [selectedDeliveryMethod, setSelectedDeliveryMethod] = useState('');
   const [showAddRecipient, setShowAddRecipient] = useState(false);
+  const [showCountrySelector, setShowCountrySelector] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const supportedCountries = getSupportedCountries();
@@ -45,6 +47,11 @@ export default function SendScreen() {
 
   const generateTrackingNumber = () => {
     return 'ST' + Date.now().toString() + Math.random().toString(36).substr(2, 5).toUpperCase();
+  };
+
+  const handleCountrySelect = (countryCode: string) => {
+    setSelectedCountry(countryCode);
+    setShowCountrySelector(false);
   };
 
   const handleSendMoney = async () => {
@@ -134,23 +141,33 @@ export default function SendScreen() {
       <Text style={styles.stepTitle}>Select Destination Country</Text>
       <Text style={styles.stepSubtitle}>Where are you sending money?</Text>
       
-      <View style={styles.countriesGrid}>
-        {supportedCountries.map((country) => (
-          <TouchableOpacity
-            key={country.code}
-            style={[
-              styles.countryCard,
-              selectedCountry === country.code && styles.selectedCountryCard
-            ]}
-            onPress={() => setSelectedCountry(country.code)}
-          >
-            <Text style={styles.countryFlag}>{country.flag_emoji}</Text>
-            <Text style={styles.countryName}>{country.name}</Text>
-            <Text style={styles.countryRate}>1 USD = {country.currency}</Text>
-          </TouchableOpacity>
-        ))}
-      </View>
+      {/* Country Selection Button */}
+      <TouchableOpacity
+        style={styles.countrySelectButton}
+        onPress={() => setShowCountrySelector(true)}
+      >
+        <View style={styles.countrySelectContent}>
+          <MapPin size={20} color="#6b7280" />
+          <View style={styles.countrySelectInfo}>
+            {selectedCountryData ? (
+              <>
+                <Text style={styles.selectedCountryFlag}>{selectedCountryData.flag_emoji}</Text>
+                <View style={styles.selectedCountryDetails}>
+                  <Text style={styles.selectedCountryName}>{selectedCountryData.name}</Text>
+                  <Text style={styles.selectedCountryRate}>
+                    1 USD = {exchangeRate.toFixed(4)} {selectedCountryData.currency}
+                  </Text>
+                </View>
+              </>
+            ) : (
+              <Text style={styles.countrySelectPlaceholder}>Select destination country</Text>
+            )}
+          </View>
+          <ChevronRight size={20} color="#6b7280" />
+        </View>
+      </TouchableOpacity>
 
+      {/* Continue Button */}
       <TouchableOpacity
         style={[styles.continueButton, !selectedCountry && styles.disabledButton]}
         disabled={!selectedCountry}
@@ -340,6 +357,16 @@ export default function SendScreen() {
         {step === 4 && renderStep4()}
       </ScrollView>
 
+      {/* Country Selector Modal */}
+      <Modal visible={showCountrySelector} animationType="slide" presentationStyle="fullScreen">
+        <CountrySelector
+          countries={supportedCountries}
+          selectedCountry={selectedCountry}
+          onSelectCountry={handleCountrySelect}
+          onClose={() => setShowCountrySelector(false)}
+        />
+      </Modal>
+
       {/* Add Recipient Modal */}
       <Modal visible={showAddRecipient} animationType="slide" presentationStyle="pageSheet">
         <RecipientForm
@@ -415,42 +442,48 @@ const styles = StyleSheet.create({
     color: '#6b7280',
     marginBottom: 24,
   },
-  countriesGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-    marginBottom: 32,
-  },
-  countryCard: {
+  countrySelectButton: {
     backgroundColor: '#ffffff',
     borderRadius: 12,
     padding: 20,
-    width: '48%',
-    alignItems: 'center',
-    marginBottom: 12,
-    borderWidth: 2,
-    borderColor: 'transparent',
+    marginBottom: 32,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
   },
-  selectedCountryCard: {
-    borderColor: '#2563eb',
+  countrySelectContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
-  countryFlag: {
-    fontSize: 32,
-    marginBottom: 8,
+  countrySelectInfo: {
+    flex: 1,
+    marginLeft: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
   },
-  countryName: {
+  countrySelectPlaceholder: {
+    fontSize: 16,
+    color: '#9ca3af',
+  },
+  selectedCountryFlag: {
+    fontSize: 24,
+    marginRight: 12,
+  },
+  selectedCountryDetails: {
+    flex: 1,
+  },
+  selectedCountryName: {
     fontSize: 16,
     fontWeight: '600',
     color: '#1f2937',
-    marginBottom: 4,
+    marginBottom: 2,
   },
-  countryRate: {
-    fontSize: 12,
+  selectedCountryRate: {
+    fontSize: 14,
     color: '#6b7280',
   },
   amountContainer: {
