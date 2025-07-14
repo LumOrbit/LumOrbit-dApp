@@ -73,9 +73,14 @@ export function useUserProfile() {
     if (!user) return { error: new Error('No user logged in') };
 
     try {
+      const updateData = {
+        ...updates,
+        updated_at: new Date().toISOString()
+      };
+
       const { data, error } = await supabase
         .from('users')
-        .update(updates)
+        .update(updateData)
         .eq('id', user.id)
         .select()
         .single();
@@ -91,10 +96,79 @@ export function useUserProfile() {
     }
   };
 
+  const deleteProfile = async () => {
+    if (!user) return { error: new Error('No user logged in') };
+
+    try {
+      // First, we should probably archive or soft delete rather than hard delete
+      // But for complete CRUD, here's the hard delete option
+      const { error } = await supabase
+        .from('users')
+        .delete()
+        .eq('id', user.id);
+
+      if (error) {
+        return { error };
+      }
+
+      setProfile(null);
+      return { error: null };
+    } catch (error) {
+      return { error };
+    }
+  };
+
+  const updateWalletInfo = async (walletAddress: string, publicKey: string, encryptedPrivateKey: string) => {
+    return updateProfile({
+      wallet_address: walletAddress,
+      public_key: publicKey,
+      private_key: encryptedPrivateKey
+    });
+  };
+
+  const updateVerificationStatus = async (isVerified: boolean) => {
+    return updateProfile({ is_verified: isVerified });
+  };
+
+  const updatePersonalInfo = async (fullName: string, phone?: string, country?: string) => {
+    const updates: Partial<UserProfile> = { full_name: fullName };
+    if (phone) updates.phone = phone;
+    if (country) updates.country = country;
+    return updateProfile(updates);
+  };
+
+  const updatePreferences = async (preferredLanguage: string) => {
+    return updateProfile({ preferred_language: preferredLanguage });
+  };
+
+  const isProfileComplete = () => {
+    if (!profile) return false;
+    return !!(profile.full_name && profile.phone && profile.country);
+  };
+
+  const hasWallet = () => {
+    if (!profile) return false;
+    return !!(profile.wallet_address && profile.public_key);
+  };
+
+  const isVerified = () => {
+    if (!profile) return false;
+    return profile.is_verified;
+  };
+
   return {
     profile,
     loading,
+    createProfile,
     updateProfile,
+    deleteProfile,
+    updateWalletInfo,
+    updateVerificationStatus,
+    updatePersonalInfo,
+    updatePreferences,
+    isProfileComplete,
+    hasWallet,
+    isVerified,
     refetch: fetchProfile,
   };
 }
