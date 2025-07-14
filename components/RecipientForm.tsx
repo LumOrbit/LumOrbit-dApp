@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, Alert } from 'react-native';
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, Alert, Modal } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { User, Phone, Mail, MapPin, CreditCard, Wallet, Star, X, Check } from 'lucide-react-native';
+import { User, Phone, Mail, MapPin, CreditCard, Wallet, Star, X, Check, ChevronRight } from 'lucide-react-native';
 import Flag from 'react-native-round-flags';
 import { useRecipients } from '@/hooks/useRecipients';
 import { useCountries } from '@/hooks/useCountries';
 import { Database } from '@/lib/database.types';
+import CountrySelector from '@/components/CountrySelector';
 
 type Recipient = Database['public']['Tables']['recipients']['Row'];
 type RecipientInsert = Database['public']['Tables']['recipients']['Insert'];
@@ -40,6 +41,7 @@ export default function RecipientForm({ recipient, onClose, onSuccess }: Recipie
 
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [showCountrySelector, setShowCountrySelector] = useState(false);
 
   const updateFormData = (field: string, value: string | boolean) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -135,6 +137,11 @@ export default function RecipientForm({ recipient, onClose, onSuccess }: Recipie
 
   const supportedCountries = getSupportedCountries();
 
+  const handleCountrySelect = (countryCode: string) => {
+    updateFormData('country', countryCode);
+    setShowCountrySelector(false);
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
@@ -227,23 +234,29 @@ export default function RecipientForm({ recipient, onClose, onSuccess }: Recipie
             {/* Country */}
             <View style={styles.inputGroup}>
               <Text style={styles.label}>Country *</Text>
-              <View style={styles.countryGrid}>
-                {supportedCountries.map((country) => (
-                  <TouchableOpacity
-                    key={country.id}
-                    style={[
-                      styles.countryOption,
-                      formData.country === country.code && styles.selectedCountry
-                    ]}
-                    onPress={() => updateFormData('country', country.code)}
-                  >
-                    <View style={styles.countryFlagContainer}>
-                      <Flag code={country.code} style={styles.countryFlagImage} />
-                    </View>
-                    <Text style={styles.countryName}>{country.name}</Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
+              <TouchableOpacity
+                style={[styles.countrySelectButton, errors.country && styles.inputError]}
+                onPress={() => setShowCountrySelector(true)}
+              >
+                <View style={styles.countrySelectContent}>
+                  <MapPin size={20} color="#6b7280" />
+                  <View style={styles.countrySelectInfo}>
+                    {formData.country ? (
+                      <>
+                        <View style={styles.selectedCountryFlagContainer}>
+                          <Flag code={formData.country} style={styles.selectedCountryFlagImage} />
+                        </View>
+                        <Text style={styles.selectedCountryName}>
+                          {supportedCountries.find(c => c.code === formData.country)?.name || formData.country}
+                        </Text>
+                      </>
+                    ) : (
+                      <Text style={styles.countrySelectPlaceholder}>Select country</Text>
+                    )}
+                  </View>
+                  <ChevronRight size={20} color="#6b7280" />
+                </View>
+              </TouchableOpacity>
               {errors.country && <Text style={styles.errorText}>{errors.country}</Text>}
             </View>
           </View>
@@ -351,6 +364,16 @@ export default function RecipientForm({ recipient, onClose, onSuccess }: Recipie
           </TouchableOpacity>
         </View>
       </ScrollView>
+
+      {/* Country Selector Modal */}
+      <Modal visible={showCountrySelector} animationType="slide" presentationStyle="fullScreen">
+        <CountrySelector
+          countries={supportedCountries}
+          selectedCountry={formData.country}
+          onSelectCountry={handleCountrySelect}
+          onClose={() => setShowCountrySelector(false)}
+        />
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -449,46 +472,48 @@ const styles = StyleSheet.create({
     color: '#ef4444',
     marginTop: 4,
   },
-  countryGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    marginHorizontal: -6,
+  countrySelectButton: {
+    backgroundColor: '#ffffff',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+    padding: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
-  countryOption: {
+  countrySelectContent: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#ffffff',
-    borderRadius: 8,
-    padding: 12,
-    margin: 6,
-    borderWidth: 2,
-    borderColor: 'transparent',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
   },
-  selectedCountry: {
-    borderColor: '#2563eb',
-    backgroundColor: '#f0f9ff',
+  countrySelectInfo: {
+    flex: 1,
+    marginLeft: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
   },
-  countryFlagContainer: {
-    marginRight: 8,
-    width: 20,
-    height: 20,
-    borderRadius: 10,
+  countrySelectPlaceholder: {
+    fontSize: 16,
+    color: '#9ca3af',
+  },
+  selectedCountryFlagContainer: {
+    marginRight: 12,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
     overflow: 'hidden',
     justifyContent: 'center',
     alignItems: 'center',
   },
-  countryFlagImage: {
-    width: 20,
-    height: 20,
+  selectedCountryFlagImage: {
+    width: 24,
+    height: 24,
   },
-  countryName: {
-    fontSize: 14,
-    fontWeight: '500',
+  selectedCountryName: {
+    fontSize: 16,
+    fontWeight: '600',
     color: '#1f2937',
   },
   deliveryMethods: {
