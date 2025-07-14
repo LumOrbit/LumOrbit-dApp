@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { User, Phone, Mail, MapPin, CreditCard, Wallet, Star, X, Check } from 'lucide-react-native';
+import Flag from 'react-native-round-flags';
 import { useRecipients } from '@/hooks/useRecipients';
 import { useCountries } from '@/hooks/useCountries';
 import { Database } from '@/lib/database.types';
@@ -236,7 +237,9 @@ export default function RecipientForm({ recipient, onClose, onSuccess }: Recipie
                     ]}
                     onPress={() => updateFormData('country', country.code)}
                   >
-                    <Text style={styles.countryFlag}>{country.flag_emoji}</Text>
+                    <View style={styles.countryFlagContainer}>
+                      <Flag code={country.code} style={styles.countryFlagImage} />
+                    </View>
                     <Text style={styles.countryName}>{country.name}</Text>
                   </TouchableOpacity>
                 ))}
@@ -470,9 +473,18 @@ const styles = StyleSheet.create({
     borderColor: '#2563eb',
     backgroundColor: '#f0f9ff',
   },
-  countryFlag: {
-    fontSize: 20,
+  countryFlagContainer: {
     marginRight: 8,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    overflow: 'hidden',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  countryFlagImage: {
+    width: 20,
+    height: 20,
   },
   countryName: {
     fontSize: 14,
